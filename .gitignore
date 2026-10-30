@@ -7,6 +7,8 @@ coverage/
 # Rust and Tauri
 src-tauri/target/
 src-tauri/gen/
+# machine-specific build workaround (see src-tauri/.cargo/config.toml)
+src-tauri/.cargo/config.toml
 
 # Local environment and secrets
 .env
