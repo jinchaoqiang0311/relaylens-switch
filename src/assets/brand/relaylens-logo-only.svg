@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- RelayLens brand mark used across the UI (shell, sign-in, share poster).
+       Source-authored artwork for the RelayLens Switch fork, Apache-2.0. -->
+  <rect width="512" height="512" rx="112" fill="#0E1A24"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#22D3EE" stroke-width="38"/>
+  <circle cx="256" cy="256" r="36" fill="#22D3EE"/>
+</svg>

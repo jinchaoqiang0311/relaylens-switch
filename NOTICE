@@ -1,0 +1,14 @@
+RelayLens Switch
+Copyright 2026 RelayLens Switch contributors
+
+This product includes software developed by RelayLens Switch contributors.
+
+This distribution is a fork of Folkbench Switch
+(https://github.com/Folkbench/folkbench), whose `apps/switch` client code is
+licensed under the Apache License 2.0. Required third-party notices are
+retained in THIRD_PARTY_NOTICES.md and THIRD_PARTY_LICENSES.txt.
+
+The Apache License 2.0 applies to the source code unless a file or a
+third-party notice states otherwise. It does not grant permission to use the
+RelayLens name, logos, or official-distribution identity except for
+reasonable descriptive use. See TRADEMARKS.md.

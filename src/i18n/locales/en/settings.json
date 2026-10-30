@@ -1,0 +1,91 @@
+{
+  "settings": {
+    "about": {
+      "title": "About",
+      "version": "Version",
+      "channel": "Release channel",
+      "beta": "Beta",
+      "commit": "Build commit",
+      "unavailable": "Version information is unavailable. Reopen Settings to try again.",
+      "update": {
+        "check": "Check for updates",
+        "checking": "Checking for updates…",
+        "none": "You're on the latest version.",
+        "available": "Version {{version}} is available.",
+        "install": "Download and install",
+        "downloading": "Downloading update… {{percent}}%",
+        "downloadingUnknown": "Downloading update…",
+        "ready": "Update installed. Restart to apply it.",
+        "restart": "Restart now",
+        "failed": "Could not check for updates. Check your connection and try again.",
+        "installFailed": "Could not install the update. Try again later, or download the installer from Releases."
+      }
+    },
+    "account": {
+      "checking": "Checking account…",
+      "dialog": {
+        "description": "RelayLens opens in your system browser. Sign in or create an account there, then return to Switch automatically.",
+        "privacy": "The client stores a separate session only. Relay Keys, tool configuration, and local usage are not uploaded.",
+        "title": "Sign in or create a RelayLens account"
+      },
+      "guest": "Using Switch locally",
+      "localOnly": "Account sign-in is optional. Saved Keys stay here.",
+      "signIn": "Sign in or register",
+      "signOut": "Sign out",
+      "signOutFailed": "Could not sign out. Please try again when connected.",
+      "title": "RelayLens account",
+      "signInShort": "Sign in"
+    },
+    "appearance": {
+      "theme": {
+        "dark": "Dark",
+        "light": "Light",
+        "system": "System",
+        "title": "Theme"
+      },
+      "title": "Appearance",
+      "description": "Pages, charts, menus, and dialogs share the same theme.",
+      "switchToLight": "Switch to light mode",
+      "switchToDark": "Switch to dark mode",
+      "saveFailed": "Could not save the appearance. Try again."
+    },
+    "description": "Adjust appearance, language, and privacy.",
+    "general": {
+      "title": "General"
+    },
+    "language": {
+      "description": "English is the default and fallback language.",
+      "options": {
+        "en": "English",
+        "zh": "简体中文"
+      },
+      "saved": "Language preference saved.",
+      "switchTo": "Switch to {{language}}",
+      "title": "Language"
+    },
+    "privacy": {
+      "body": "No telemetry. Config and Keys are stored locally, not uploaded to RelayLens. Local usage extracts model and token counts from session files without uploading conversation content.",
+      "telemetry": {
+        "description": "RelayLens Switch does not send telemetry in this version.",
+        "title": "Telemetry"
+      },
+      "title": "Privacy"
+    },
+    "title": "Settings",
+    "updates": {
+      "channel": {
+        "beta": "Beta",
+        "title": "Update channel"
+      },
+      "title": "Updates"
+    },
+    "uiMode": {
+      "title": "Interface mode",
+      "description": "Easy mode keeps core actions only; Pro shows every tab and advanced controls.",
+      "easy": "Easy mode",
+      "pro": "Pro mode",
+      "saved": "Interface mode saved.",
+      "saveFailed": "Could not save interface mode. Try again."
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "navigation": {
+    "account": {
+      "label": "账户"
+    },
+    "connection": {
+      "label": "连接状态"
+    },
+    "groups": {
+      "general": "概览",
+      "local": "本地",
+      "system": "系统",
+      "workspace": "工作区"
+    },
+    "items": {
+      "apiKeys": "API Keys",
+      "changes": "变更历史",
+      "discover": "发现服务",
+      "overview": "概览",
+      "services": "我的线路",
+      "settings": "设置",
+      "tools": "工具",
+      "usage": "本机用量",
+      "discoverEasy": "找服务",
+      "usageEasy": "用量",
+      "servicesEasy": "首页"
+    },
+    "primary": "主导航",
+    "mode": {
+      "label": "界面模式",
+      "easy": "简易版",
+      "pro": "专业版",
+      "toPro": "专业版",
+      "toEasy": "回到简易"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "updates": {
+    "actions": {
+      "installLater": "Install later",
+      "restartNow": "Restart now"
+    },
+    "available": {
+      "description": "A signed RelayLens Switch update is available.",
+      "title": "Update available"
+    },
+    "downloading": "Downloading update…",
+    "none": "RelayLens Switch is up to date.",
+    "ready": "The update is ready to install."
+  }
+}

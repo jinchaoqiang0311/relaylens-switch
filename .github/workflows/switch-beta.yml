@@ -1,0 +1,253 @@
+name: Switch build installers
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: 'Full public main commit SHA; empty uses the dispatch commit'
+        type: string
+        required: false
+      mode:
+        description: 'Build only. Default signs and notarizes macOS; never publishes.'
+        type: choice
+        options: [signed-candidate, build-only]
+        default: signed-candidate
+        required: true
+      platforms:
+        description: 'Single-platform builds are for diagnostics, not publication'
+        type: choice
+        options: [all, macos-arm64, macos-x64, windows-x64]
+        default: all
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: switch-build-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.repository == 'RelayLens/relaylens' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      mode: ${{ steps.release.outputs.mode }}
+      commit: ${{ steps.release.outputs.commit }}
+      notarize: ${{ steps.release.outputs.notarize }}
+      matrix: ${{ steps.release.outputs.matrix }}
+      selected_platforms: ${{ steps.release.outputs.selected_platforms }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Validate immutable source and build-only identity
+        id: release
+        shell: bash
+        env:
+          REQUESTED_SOURCE: ${{ inputs.source_commit }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+          REQUESTED_PLATFORMS: ${{ inputs.platforms }}
+        run: node apps/switch/scripts/build-context.mjs
+      - run: node --test apps/switch/scripts/*.test.mjs
+      - run: node scripts/check-source-hygiene.mjs
+  build:
+    needs: validate
+    environment: ${{ needs.validate.outputs.mode == 'build-only' && 'switch-build' || 'switch-beta' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.validate.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      RELAYLENS_BUILD_COMMIT: ${{ needs.validate.outputs.commit }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: 1.98.1
+          targets: ${{ matrix.target }}
+          components: rustfmt
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: switch-release-bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/switch/bun.lock') }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: apps/switch/src-tauri -> target
+          prefix-key: switch-release-${{ matrix.platform }}
+          cache-workspace-crates: false
+          cache-on-failure: false
+      - name: Prepare temporary certificate and App Store Connect API private key
+        id: apple_files
+        if: runner.os == 'macOS' && needs.validate.outputs.notarize == 'true'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: node apps/switch/scripts/apple-ci.mjs prepare
+      - name: Import and verify Developer ID and API Key authentication
+        if: runner.os == 'macOS' && needs.validate.outputs.notarize == 'true'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          signing_password=$(openssl rand -hex 24)
+          echo "::add-mask::$signing_password"
+          signing_keychain="$RELAYLENS_APPLE_SIGNING_DIR/signing.keychain-db"
+          security create-keychain -p "$signing_password" "$signing_keychain"
+          security unlock-keychain -p "$signing_password" "$signing_keychain"
+          security set-keychain-settings -lut 21600 "$signing_keychain"
+          security import "$RELAYLENS_APPLE_SIGNING_DIR/certificate.p12" -k "$signing_keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign > "$RELAYLENS_APPLE_SIGNING_DIR/import.log" 2>&1 || { echo 'Certificate import failed; verify the p12 and its export password.'; exit 1; }
+          security list-keychains -d user -s "$signing_keychain" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$signing_password" "$signing_keychain" > "$RELAYLENS_APPLE_SIGNING_DIR/keychain.log" 2>&1
+          security find-identity -v -p codesigning "$signing_keychain" > "$RELAYLENS_APPLE_SIGNING_DIR/identities.txt"
+          node -e 'const fs=require("node:fs"); const text=fs.readFileSync(process.env.RELAYLENS_APPLE_SIGNING_DIR + "/identities.txt", "utf8"); if (!text.includes("\"" + process.env.APPLE_SIGNING_IDENTITY + "\"")) { console.error("No valid matching Developer ID Application certificate and private key."); process.exit(1); }'
+          xcrun notarytool history --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --output-format json > "$RELAYLENS_APPLE_SIGNING_DIR/history.json" 2> "$RELAYLENS_APPLE_SIGNING_DIR/notary-error.txt" || { echo 'Apple API Key authentication failed; verify the Key ID, Issuer ID, p8 and team access.'; exit 1; }
+          echo 'Developer ID certificate and Apple API Key authentication verified.'
+      - name: Mark isolated CI host and install dependencies
+        shell: bash
+        run: |
+          touch apps/switch/.relaylens-switch-development-host
+          bun install --cwd apps/switch --frozen-lockfile
+      - run: bun run check:switch
+      - run: bun run build:switch:web
+      - run: cargo fmt --all --check --manifest-path apps/switch/src-tauri/Cargo.toml
+      - run: cargo test --workspace --locked --manifest-path apps/switch/src-tauri/Cargo.toml
+      - name: Build installer
+        shell: bash
+        working-directory: apps/switch
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && needs.validate.outputs.notarize == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_API_KEY: ${{ runner.os == 'macOS' && needs.validate.outputs.notarize == 'true' && secrets.APPLE_API_KEY || '' }}
+          APPLE_API_ISSUER: ${{ runner.os == 'macOS' && needs.validate.outputs.notarize == 'true' && secrets.APPLE_API_ISSUER || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          NOTARIZE: ${{ needs.validate.outputs.notarize }}
+          TARGET: ${{ matrix.target }}
+          BUNDLE: ${{ matrix.bundle }}
+        run: node scripts/apple-ci.mjs build
+      - name: Verify approved DMG background and native installation layout
+        if: runner.os == 'macOS'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: node apps/switch/scripts/dmg-layout.mjs
+      - name: Notarize and verify the macOS distribution
+        if: runner.os == 'macOS' && needs.validate.outputs.notarize == 'true'
+        shell: bash
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          retry() {
+            local attempt=1
+            local max=8
+            local delay=20
+            until "$@"; do
+              if (( attempt >= max )); then
+                echo "gave up after ${attempt} attempts: $*"
+                return 1
+              fi
+              echo "attempt ${attempt} failed; sleeping ${delay}s then retrying: $*"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay + 20))
+            done
+          }
+          staple_validate() {
+            local path=$1
+            xcrun stapler staple "$path"
+            xcrun stapler validate "$path"
+          }
+          bundle="apps/switch/src-tauri/target/$TARGET/release/bundle"
+          app="$bundle/macos/RelayLens Switch.app"
+          codesign --verify --deep --strict "$app"
+          codesign -dv --verbose=4 "$app" 2> "$RELAYLENS_APPLE_SIGNING_DIR/codesign-details.txt"
+          node -e 'const fs=require("node:fs"); const text=fs.readFileSync(process.env.RELAYLENS_APPLE_SIGNING_DIR + "/codesign-details.txt", "utf8"); if (!text.split("\n").includes("TeamIdentifier=" + process.env.APPLE_TEAM_ID) || !/flags=.*\bruntime\b/.test(text)) { console.error("Application signing team or hardened runtime verification failed."); process.exit(1); }'
+          if ! retry staple_validate "$app"; then
+            echo "App ticket missing after retries; re-submitting the app for notarization."
+            app_zip="$RELAYLENS_APPLE_SIGNING_DIR/RelayLens-Switch-app.zip"
+            rm -f "$app_zip"
+            ditto -c -k --sequesterRsrc --keepParent "$app" "$app_zip"
+            retry bash -c 'xcrun notarytool submit "$0" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait --output-format json > "$RELAYLENS_APPLE_SIGNING_DIR/app-notarization.json"' "$app_zip"
+            node -e 'const fs=require("node:fs"); if (JSON.parse(fs.readFileSync(process.env.RELAYLENS_APPLE_SIGNING_DIR + "/app-notarization.json", "utf8")).status !== "Accepted") { console.error("Apple did not accept the app notarization."); process.exit(1); }'
+            retry staple_validate "$app"
+          fi
+          spctl --assess --type execute "$app"
+          shopt -s nullglob
+          installers=("$bundle"/dmg/*.dmg)
+          test "${#installers[@]}" -eq 1
+          retry bash -c 'xcrun notarytool submit "$0" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait --output-format json > "$RELAYLENS_APPLE_SIGNING_DIR/notarization.json"' "${installers[0]}"
+          node -e 'const fs=require("node:fs"); if (JSON.parse(fs.readFileSync(process.env.RELAYLENS_APPLE_SIGNING_DIR + "/notarization.json", "utf8")).status !== "Accepted") { console.error("Apple did not accept the DMG notarization."); process.exit(1); }'
+          retry staple_validate "${installers[0]}"
+
+      - name: Collect only installers and public build metadata
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          MODE: ${{ needs.validate.outputs.mode }}
+        run: node apps/switch/scripts/artifacts.mjs collect "$PLATFORM" "$MODE" release-artifacts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: switch-${{ matrix.platform }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release-artifacts/*.dmg
+            release-artifacts/*.exe
+            release-artifacts/*.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove temporary Apple credential material
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          signing_directory="${RELAYLENS_APPLE_SIGNING_DIR:-}"
+          if [[ -n "$signing_directory" && "$signing_directory" == "$RUNNER_TEMP"/relaylens-switch-signing-* ]]; then
+            security delete-keychain "$signing_directory/signing.keychain-db" 2>/dev/null || true
+            rm -f -- "$signing_directory/certificate.p12" "$signing_directory/AuthKey.p8" "$signing_directory/import.log" "$signing_directory/keychain.log" "$signing_directory/identities.txt" "$signing_directory/history.json" "$signing_directory/notary-error.txt" "$signing_directory/codesign-details.txt" "$signing_directory/notarization.json"
+            rmdir "$signing_directory" 2>/dev/null || true
+          fi
+  verify:
+    needs: [validate, build]
+    runs-on: ubuntu-22.04
+    env:
+      RELAYLENS_BUILD_COMMIT: ${{ needs.validate.outputs.commit }}
+      RELEASE_MODE: ${{ needs.validate.outputs.mode }}
+      BUILD_PLATFORMS: ${{ needs.validate.outputs.selected_platforms }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: switch-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-artifacts
+          merge-multiple: true
+      - name: Verify original installers and freeze their reviewed manifest
+        run: node apps/switch/scripts/artifacts.mjs verify release-artifacts "$RELEASE_MODE"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: switch-reviewed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 30
