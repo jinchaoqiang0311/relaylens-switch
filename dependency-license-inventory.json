@@ -4,7 +4,7 @@
   "hashes": {
     "package.json": "047d1fcae44162e15f67fd453a6c004ce6681f6a3a17264e6b4bf5cf87497e5e",
     "bun.lock": "22a594dc630c68045d2df9d780bd53d0f0f3f55d7f704a83345a28c5c2e861cb",
-    "src-tauri/Cargo.lock": "05ab26fd3647535c0620514e2cac58fc92362429080801b0e1dda5c69e7aee69"
+    "src-tauri/Cargo.lock": "643e9d9d870d476c39c170db709da8e1b1cf5d645f949a62cc1fe170972dee40"
   },
   "packages": [
     {

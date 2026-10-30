@@ -1216,45 +1216,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
-name = "relaylens-switch"
-version = "0.1.0-beta.5"
-dependencies = [
- "arboard",
- "base64 0.22.1",
- "chrono",
- "relaylens-switch-contract",
- "json5",
- "png 0.17.16",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "tauri",
- "tauri-build",
- "tauri-plugin-deep-link",
- "tauri-plugin-dialog",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-single-instance",
- "tauri-plugin-updater",
- "toml_edit 0.22.27",
- "url",
- "uuid",
- "windows-sys 0.61.2",
- "zstd",
-]
-
-[[package]]
-name = "relaylens-switch-contract"
-version = "0.0.1"
-dependencies = [
- "serde",
- "ts-rs",
-]
-
-[[package]]
 name = "foreign-types"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3371,6 +3332,45 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "relaylens-switch"
+version = "0.1.0-beta.5"
+dependencies = [
+ "arboard",
+ "base64 0.22.1",
+ "chrono",
+ "json5",
+ "png 0.17.16",
+ "relaylens-switch-contract",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-dialog",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-updater",
+ "toml_edit 0.22.27",
+ "url",
+ "uuid",
+ "windows-sys 0.61.2",
+ "zstd",
+]
+
+[[package]]
+name = "relaylens-switch-contract"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "ts-rs",
+]
 
 [[package]]
 name = "reqwest"
